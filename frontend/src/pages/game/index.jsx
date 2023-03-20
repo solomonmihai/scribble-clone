@@ -37,7 +37,7 @@ const PlayerCard = styled.div`
   color: ${({ isSelf }) => isSelf ? 'green' : 'white'};
   padding: 10px;
   text-align: center;
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: ${({ guessed }) => guessed ? "rgba(63, 29, 64, 0.3)" : "rgba(255, 255, 255, 0.1)"};
   border-radius: 10px;
   margin: 3px 0px;
 `;
@@ -60,6 +60,13 @@ const Word = styled.div`
   width: fit-content;
 `;
 
+const WaitingToStart = styled.div`
+  width: 100%;
+  height: 100%;
+  font-size: 2em;
+  text-align: center;
+`;
+
 export default function Game() {
   const navigate = useNavigate();
 
@@ -69,6 +76,7 @@ export default function Game() {
   const [playersList, setPlayersList] = useState([]);
   const [wordsToChooseFrom, setWordsToChooseFrom] = useState(null);
   const [word, setWord] = useState("drawer is choosing word");
+  const [started, setStarted] = useState(false);
 
   useEffect(() => {
     if (!username) {
@@ -95,12 +103,20 @@ export default function Game() {
       setPlayersList(players);
     });
 
+    socket.on("started", () => {
+      setStarted(true);
+    });
+
     socket.on("choose-word", (payload) => {
       setWordsToChooseFrom(payload);
     });
 
-    socket.on("word-length", (payload) => {
-      setWord(new Array(payload).fill("_").join(""));
+    socket.on("word-length", (wordLength) => {
+      setWord(new Array(wordLength).fill("_").join(""));
+    });
+
+    socket.on("guessed-word", (payload) => {
+      setWord(payload);
     });
 
     return () => {
@@ -120,23 +136,29 @@ export default function Game() {
 
   return (
     <PageWrapper>
-      <TopBar>
-        <Word>{word}</Word>
-      </TopBar>
+      {
+        started && <TopBar>
+          <Word>{word}</Word>
+        </TopBar>
+      }
       <LayoutWrapper>
         <PlayersPanel>
           {
             playersList.map((player, index) =>
-              <PlayerCard key={index} isSelf={username == player.username}>
-               {player.username}
+              <PlayerCard key={index} isSelf={username == player.username} guessed={player.guessed}>
+                {player.username}
               </PlayerCard>
             )
           }
         </PlayersPanel>
-        <Canvas />
+        {
+          started ? <Canvas /> : (
+            <WaitingToStart>waiting to start ...</WaitingToStart>
+          )
+        }
         <Chat />
         {
-          wordsToChooseFrom && <ChooseWord words={wordsToChooseFrom} chooseWord={chooseWord}/>
+          wordsToChooseFrom && <ChooseWord words={wordsToChooseFrom} chooseWord={chooseWord} />
         }
       </LayoutWrapper>
     </PageWrapper>

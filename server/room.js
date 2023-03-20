@@ -23,17 +23,37 @@ export default class Room {
     this.all("players-list", { players });
   }
 
+  onChatMsg(player, msg) {
+    msg = msg.trim();
+    if (msg == '') {
+      return;
+    }
+
+    io.to(this.name).emit("chat-msg", { username: player.username, msg });
+
+    if (this.drawer.socket.id != player.socket.id) {
+      if (msg == this.word) {
+        player.socket.emit("guessed-word", this.word);
+        player.socket.emit("chat-msg", { isLog: true, msg: `you guessed right: ${this.word}` });
+        player.socket.to(this.name).emit("chat-msg", {
+          isLog: true,
+          msg: `${player.username} guessed the word`
+        });
+
+        this.players = this.players.map(p => p.socket.id == player.socket.id ? { ...p, guessed: true } : p);
+
+        this.sendPlayersList();
+      }
+    }
+  }
+
   addPlayer(player) {
     this.players.push(player)
     this.sendPlayersList();
 
     // todo: maybe keep a log of the chat for new players that join
     player.socket.on("sent-chat-msg", (msg) => {
-      if (msg.trim() == '') {
-        return;
-      }
-      // todo: sometimes playerMap[socket.id] is undefined
-      io.to(this.name).emit("chat-msg", { username: player.username, msg });
+      this.onChatMsg(player, msg)
     });
 
     this.all("chat-msg", {
@@ -73,13 +93,18 @@ export default class Room {
   startGame() {
     this.drawer = this.chooseDrawer();
 
+    // send start event to all except the drawer
+    this.drawer.socket.to(this.name).emit("started");
+
     const wordsToChooseFrom = new Array(3).fill(null).map(() => this.chooseWord());
 
-    io.to(this.drawer.socket.id).emit("choose-word", wordsToChooseFrom);
+    this.drawer.socket.emit("choose-word", wordsToChooseFrom);
 
     this.drawer.socket.on("chose-word", (word) => {
       this.word = word;
-
+      // send start event to drawer
+      io.to(this.drawer.socket.id).emit("started");
+      // sent the word length to the other players
       this.drawer.socket.to(this.name).emit("word-length", this.word.length);
     });
   }
