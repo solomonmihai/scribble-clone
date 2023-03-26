@@ -8,6 +8,7 @@ import Chat from "./Chat";
 import ChooseWord from "./ChooseWord";
 
 import socket from "@/socket";
+import colors from "../../colors";
 
 const PageWrapper = styled.div`
   display: flex;
@@ -40,6 +41,8 @@ const PlayerCard = styled.div`
   background-color: ${({ guessed }) => guessed ? "rgba(63, 29, 64, 0.3)" : "rgba(255, 255, 255, 0.1)"};
   border-radius: 10px;
   margin: 3px 0px;
+  display: flex;
+  justify-content: space-between;
 `;
 
 const TopBar = styled.div`
@@ -67,6 +70,25 @@ const WaitingToStart = styled.div`
   text-align: center;
 `;
 
+const LeaderPanel = styled.div`
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+`;
+
+const StartButton = styled.button`
+  color: white;
+  border: none;
+  border-bottom: 2px solid ${colors.white};
+  background-color: transparent;
+  font-size: 1rem;
+  cursor: pointer;
+`;
+
 export default function Game() {
   const navigate = useNavigate();
 
@@ -77,6 +99,8 @@ export default function Game() {
   const [wordsToChooseFrom, setWordsToChooseFrom] = useState(null);
   const [word, setWord] = useState("drawer is choosing word");
   const [started, setStarted] = useState(false);
+
+  const [playerProperties, setPlayerProperties] = useState({ username });
 
   useEffect(() => {
     if (!username) {
@@ -101,6 +125,13 @@ export default function Game() {
 
     socket.on("players-list", ({ players }) => {
       setPlayersList(players);
+
+      for (const p of players) {
+        if (p.sockid == socket.id) {
+          setPlayerProperties(p);
+          break;
+        }
+      }
     });
 
     socket.on("started", () => {
@@ -120,9 +151,11 @@ export default function Game() {
     });
 
     return () => {
+      // todo: fix this
       socket.emit("leave");
+      // socket.removeAllListeners();
     }
-  }, [username]);
+  }, [username, socket]);
 
   if (!isConnected) {
     return <div>not connected</div>
@@ -132,6 +165,10 @@ export default function Game() {
     setWordsToChooseFrom(null);
     setWord(word);
     socket.emit("chose-word", word);
+  }
+
+  function startGame() {
+    socket.emit("start-game");
   }
 
   return (
@@ -144,15 +181,31 @@ export default function Game() {
       <LayoutWrapper>
         <PlayersPanel>
           {
+            playerProperties.isLeader && (
+              <LeaderPanel>
+                {
+                  !started && <StartButton onClick={startGame}>start game</StartButton>
+                }
+              </LeaderPanel>
+            )
+          }
+          {
             playersList.map((player, index) =>
-              <PlayerCard key={index} isSelf={username == player.username} guessed={player.guessed}>
+              <PlayerCard key={index} isSelf={player.sockid == socket.id} guessed={player.guessed}>
+                <div style={{ width: "15px" }}>
+                  {player.isLeader && "👑"}
+                </div>
                 {player.username}
+                <div style={{ width: "15px" }}>
+                  {player.guessed && "✅"}
+                  {player.isDrawer && "🖌️"}
+                </div>
               </PlayerCard>
             )
           }
         </PlayersPanel>
         {
-          started ? <Canvas /> : (
+          started ? <Canvas isDrawer={playerProperties.isDrawer} /> : (
             <WaitingToStart>waiting to start ...</WaitingToStart>
           )
         }
