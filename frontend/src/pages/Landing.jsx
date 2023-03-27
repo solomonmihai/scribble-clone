@@ -3,6 +3,7 @@ import { keyframes } from "@emotion/react";
 import { useNavigate } from "react-router-dom";
 
 import AuthStore from "@/stores/Auth";
+import { useState } from "react";
 
 const Container = styled.div`
   width: 100vw;
@@ -105,15 +106,12 @@ export default function Landing() {
 
   const username = AuthStore.useState(s => s.username) || "";
 
-  // useEffect(() => {
-    // if (username != "") {
-      // navigate("/game");
-    // }
-  // }, []);
+  const [error, setError] = useState(null);
 
   // TODO: validate username
   function join() {
     if (username.trim().length < 4) {
+      setError("min 4 characters")
       return;
     }
     AuthStore.update(s => {
@@ -134,9 +132,10 @@ export default function Landing() {
       <InnerContainer>
         <Title>skribble clone</Title>
         <div>
-          <UsernameInput placeholder="username ..." value={username} onChange={onChange}/>
+          <UsernameInput placeholder="username ..." value={username} onChange={onChange} />
           <JoinButton onClick={join}>join</JoinButton>
         </div>
+        <div style={{ color: "red", marginTop: "7px", opacity: error ? "1" : "0" }}>{error || "x"}</div>
       </InnerContainer>
     </Container>
   )

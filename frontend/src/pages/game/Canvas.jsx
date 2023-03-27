@@ -2,7 +2,6 @@ import styled from "@emotion/styled"
 import { useEffect, useRef } from "react";
 import socket from "@/socket";
 
-// todo: fix shadow
 const CanvasC = styled.canvas`
   width: 100%;
   height: 100%;
@@ -36,29 +35,47 @@ export default function Canvas({ isDrawer }) {
 
     const mouse = { x: -1, y: -1 };
 
-    window.addEventListener("mousedown", () => dragging = true);
-    window.addEventListener("mouseup", () => {
+    function startDrag() {
+      dragging = true;
+    }
+
+    function endDrag() {
       dragging = false;
-      prevMouse = null
-    });
-    window.addEventListener("mousemove", (evt) => {
+      prevMouse = null;
+    }
+
+    function moveBrush(evt) {
+
+      evt.preventDefault();
+
       const rect = canvas.getBoundingClientRect();
-      mouse.x = evt.clientX - rect.left;
-      mouse.y = evt.clientY - rect.top;
-    });
+      const touches = evt.changedTouches;
+      if (touches && touches.length) {
+        mouse.x = touches[0].clientX - rect.left;
+        mouse.y = touches[0].clientY - rect.top;
+      } else {
+        mouse.x = evt.clientX - rect.left;
+        mouse.y = evt.clientY - rect.top;
+      }
+    }
+
+    window.addEventListener("mousedown", startDrag);
+    window.addEventListener("mouseup", endDrag);
+    window.addEventListener("mousemove", moveBrush);
+
+    window.addEventListener("touchstart", startDrag);
+    window.addEventListener("touchend", endDrag);
+    window.addEventListener("touchmove", moveBrush);
+
     window.addEventListener("resize", resize);
 
     let prevMouse = null;
 
     let animationId;
 
+    const points = [];
+
     function drawLine(p1, p2) {
-      ctx.strokeStyle = "white";
-      ctx.beginPath();
-      ctx.moveTo(p1.x, p1.y);
-      ctx.lineTo(p2.x, p2.y);
-      ctx.closePath();
-      ctx.stroke();
     }
 
     function sendDrawPoints() {
@@ -70,7 +87,8 @@ export default function Canvas({ isDrawer }) {
 
     function draw() {
       if (dragging && prevMouse) {
-        drawLine(mouse, prevMouse);
+        // spread objects to clone
+        points.push({ ...prevMouse }, { ...mouse });
         sendDrawPoints();
       }
 
@@ -78,14 +96,27 @@ export default function Canvas({ isDrawer }) {
     }
 
     socket.on("draw-points", ({ p1, p2 }) => {
-      drawLine(p1, p2);
+      points.push(p1, p2);
     });
 
     function animate() {
       animationId = requestAnimationFrame(animate);
 
+      ctx.strokeStyle = "white";
+
       if (isDrawer) {
         draw();
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = 0; i < points.length; i += 2) {
+        const [p1, p2] = points.slice(i, i + 2);
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.closePath();
+        ctx.stroke();
       }
     }
 

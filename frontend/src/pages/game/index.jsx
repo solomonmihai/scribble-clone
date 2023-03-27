@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styled from "@emotion/styled";
 
+import socket from "@/socket";
+import colors from "@/colors";
+
 import AuthStore from "@/stores/Auth";
 import Canvas from "./Canvas";
 import Chat from "./Chat";
 import ChooseWord from "./ChooseWord";
-
-import socket from "@/socket";
-import colors from "../../colors";
+import useAnnouncement from "./Announcement";
 
 const PageWrapper = styled.div`
   display: flex;
@@ -97,10 +98,12 @@ export default function Game() {
   const [isConnected, setIsConnected] = useState(socket.connected);
   const [playersList, setPlayersList] = useState([]);
   const [wordsToChooseFrom, setWordsToChooseFrom] = useState(null);
-  const [word, setWord] = useState("drawer is choosing word");
+  const [word, setWord] = useState("");
   const [started, setStarted] = useState(false);
 
   const [playerProperties, setPlayerProperties] = useState({ username });
+
+  const [Announcement, openAnnouncement] = useAnnouncement();
 
   useEffect(() => {
     if (!username) {
@@ -136,10 +139,15 @@ export default function Game() {
 
     socket.on("started", () => {
       setStarted(true);
+      openAnnouncement(10000, <div>game starting</div>);
     });
 
     socket.on("choose-word", (payload) => {
       setWordsToChooseFrom(payload);
+    });
+
+    socket.on("choosing-word", (payload) => {
+      setWord(`${payload} is choosing a word`);
     });
 
     socket.on("word-length", (wordLength) => {
@@ -214,6 +222,7 @@ export default function Game() {
           wordsToChooseFrom && <ChooseWord words={wordsToChooseFrom} chooseWord={chooseWord} />
         }
       </LayoutWrapper>
+      {Announcement}
     </PageWrapper>
   )
 }
